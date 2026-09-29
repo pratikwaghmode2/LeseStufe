@@ -15,6 +15,7 @@ from xml.sax.saxutils import escape
 from backend.services.cefr_dictionary import cefr_dict
 from backend.agents.translation_agent import LEVEL_ORDER, translation_agent
 from backend.services.gemini_client import gemini_client
+from backend.services.translation_provider import has_translation_provider, translate_vocabulary_batch
 
 
 class DeveloperAgent:
@@ -77,14 +78,14 @@ class DeveloperAgent:
                 key = token["text"].casefold()
                 unknown.setdefault(key, {"word": token["text"], "context": sentence["sentence_de"]})
 
-        if gemini_client.has_key():
+        if has_translation_provider():
             unknown_items = list(unknown.values())
             for start in range(0, len(unknown_items), 20):
-                enriched = await gemini_client.translate_vocabulary_batch(unknown_items[start:start + 20])
+                enriched = await translate_vocabulary_batch(unknown_items[start:start + 20])
                 for item in enriched:
                     word = str(item.get("word") or "").strip()
                     meaning = str(item.get("meaning") or "").strip()
-                    level = str(item.get("level") or "").upper()
+                    level = str(item.get("level") or "B1").upper()
                     if not word or not meaning or meaning.casefold() == word.casefold() or level not in LEVEL_ORDER:
                         continue
                     if not include_all and LEVEL_ORDER[level] <= LEVEL_ORDER.get(user_level, 2):

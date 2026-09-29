@@ -12,6 +12,7 @@ from backend.services.db import (
 )
 from backend.services.book_parser import BookParser
 from backend.services.gemini_client import gemini_client
+from backend.services.translation_provider import translate_vocabulary_batch
 from backend.services.cefr_dictionary import cefr_dict
 from backend.agents.translation_agent import translation_agent
 from backend.agents.grammar_agent import grammar_agent
@@ -224,7 +225,7 @@ async def translate_word_endpoint(payload: WordTranslationPayload):
             "gender": known.get("gender"),
         }
 
-    enriched = await gemini_client.translate_vocabulary_batch([{
+    enriched = await translate_vocabulary_batch([{
         "word": word,
         "context": payload.context_sentence,
     }])

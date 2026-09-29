@@ -2,6 +2,7 @@ import re
 from typing import List, Dict, Any, Optional, Tuple
 from backend.services.cefr_dictionary import cefr_dict
 from backend.services.gemini_client import gemini_client
+from backend.services.translation_provider import has_translation_provider, translate_vocabulary_batch
 
 LEVEL_ORDER = {'A1': 1, 'A2': 2, 'B1': 3, 'B2': 4, 'C1': 5}
 
@@ -204,13 +205,13 @@ class TranslationAgent:
                         'context': sentence['sentence_de'],
                     })
 
-        if not gemini_client.has_key() or not unknown:
+        if not has_translation_provider() or not unknown:
             return sentences_output
 
         enriched = []
         unknown_items = list(unknown.values())
         for start in range(0, len(unknown_items), 20):
-            enriched.extend(await gemini_client.translate_vocabulary_batch(unknown_items[start:start + 20]))
+            enriched.extend(await translate_vocabulary_batch(unknown_items[start:start + 20]))
         by_word = {str(item.get('word', '')).casefold(): item for item in enriched if item.get('word')}
 
         for sentence in sentences_output:

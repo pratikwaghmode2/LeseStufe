@@ -278,21 +278,70 @@ class TesterAgent:
         })
         record_test_run("Reader Page Gemini Enrichment", "Reader Translation", passed12, details12)
 
-        # Test 13: UI agent scores the reader experience and returns actionable feedback
+        # Test 13: DeepL supplies a translation when Gemini is unavailable
+        from backend.services import deepl_client as deepl_module
+        original_gemini_key_deepl = gemini_module.gemini_client.has_key
+        original_deepl_key = deepl_module.deepl_client.has_key
+        original_deepl_batch = deepl_module.deepl_client.translate_vocabulary_batch
+
+        async def fake_deepl_batch(entries):
+            return [{
+                "word": "Riegel",
+                "meaning": "latch",
+                "level": "B1",
+                "pos": "word",
+                "gender": None,
+            }]
+
+        try:
+            gemini_module.gemini_client.has_key = lambda: False
+            deepl_module.deepl_client.has_key = lambda: True
+            deepl_module.deepl_client.translate_vocabulary_batch = fake_deepl_batch
+            page_output = asyncio.run(
+                translation_agent.process_passage_async("Der Riegel ist geschlossen.", "A2")
+            )
+            page_token = next(
+                (token for sentence in page_output for token in sentence["tokens"]
+                 if token["text"] == "Riegel"),
+                None,
+            )
+            passed13 = bool(page_token and page_token.get("translation") == "latch")
+        except Exception:
+            passed13 = False
+            page_token = None
+        finally:
+            gemini_module.gemini_client.has_key = original_gemini_key_deepl
+            deepl_module.deepl_client.has_key = original_deepl_key
+            deepl_module.deepl_client.translate_vocabulary_batch = original_deepl_batch
+
+        details13 = (
+            "DeepL fallback translated an unknown page word when Gemini was unavailable."
+            if passed13
+            else "DeepL fallback did not populate the unknown page word."
+        )
+        results.append({
+            "name": "DeepL Translation Fallback",
+            "category": "Reader Translation",
+            "passed": passed13,
+            "details": details13
+        })
+        record_test_run("DeepL Translation Fallback", "Reader Translation", passed13, details13)
+
+        # Test 14: UI agent scores the reader experience and returns actionable feedback
         ui_audit = ui_agent.audit()
-        passed12 = ui_audit["score"] >= 75 and len(ui_audit["checks"]) >= 5
+        passed14 = ui_audit["score"] >= 75 and len(ui_audit["checks"]) >= 5
         recommendation_count = len(ui_audit.get("recommendations", []))
-        details12 = (
+        details14 = (
             f"UI/UX score: {ui_audit['score']}/{ui_audit['max_score']} ({ui_audit['grade']}); "
             f"reviewed {ui_audit['files_reviewed']} frontend files; {recommendation_count} recommendations."
         )
         results.append({
             "name": "UI Agent Experience Score",
             "category": "Frontend UX",
-            "passed": passed12,
-            "details": details12
+            "passed": passed14,
+            "details": details14
         })
-        record_test_run("UI Agent Experience Score", "Frontend UX", passed12, details12)
+        record_test_run("UI Agent Experience Score", "Frontend UX", passed14, details14)
 
         return results
 
